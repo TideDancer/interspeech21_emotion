@@ -1,0 +1,6 @@
+*.swap
+.nfs*
+cache/
+output/
+wandb/
+venv/
