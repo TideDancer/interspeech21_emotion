@@ -1,6 +1,7 @@
 # Emotion Recognition
 This repo contains the code for the paper: 
-**Speech Emotion Recognition with Multi-task Learning, X. Cai et al., INTERSPEECH 2021**
+
+***Speech Emotion Recognition with Multi-task Learning, X. Cai et al., INTERSPEECH 2021***
 
 The code is based on https://github.com/huggingface/transformers/tree/master/examples/research_projects/wav2vec2.
 
@@ -8,7 +9,7 @@ The code is based on https://github.com/huggingface/transformers/tree/master/exa
 * model.py: the Wav2vec-2.0 model that inherites from Huggingface's Wav2vec-2.0 model, with a classification head in addition to the CTC head.
 * run_emotion.py: the main python code that could runs the emotion recognition task.
 * run.sh: the script to test running
-* iemocap/: put the processed iemocap dataset here, split into 10 folds, while each has train.csv and test.csv
+* iemocap/: put the processed iemocap dataset here, split into 10 folds, while each fold has train.csv and test.csv
 * requirements.txt: required packages to be installed
 
 ## Set up environment
@@ -20,14 +21,13 @@ You might also need to install libsndfile:
 ```bash
 sudo apt-get install libsndfile1-dev
 ```
-Or refer to https://github.com/libsndfile/libsndfile
+Or refer to https://github.com/libsndfile/libsndfile.
 
 ## Prepare datasets
-We use Huggingface/datasets to prepare the dataset.
-1. Obtain IEMOCAP dataset from https://sail.usc.edu/iemocap/
-2. Extract and save wav files at /path/to/waves
-3. Split into 10 folds, according to session ID (01F, 01M, ..., 05F, 05M). For each fold, use other 9 sessions as training, and test on the selected session. For example, for the fold 01F, we use 01F as test set and remaining 9 session as training set.
-4. Create two csv files for each fold, one for training and one for testing. The name should be like: iemocap_01F.train.csv and iemocap_01F.test.csv. The csv file has 3 columns: file, emotion, text. The column 'file' indicates where to store the wav file; the column 'emotion' is the emotion label (we use 4 labels: e0, e1, e2, e3); the column 'text' is for transcript. For example, here is a sample csv file:
+1. Obtain IEMOCAP dataset from https://sail.usc.edu/iemocap/.
+2. Extract and save wav files at /path/to/waves.
+3. Split into 10 folds, according to session ID (01F, 01M, ..., 05F, 05M). For each fold, use the other 9 sessions as training, and test on the selected session. For example, for the fold 01F, we use 01F as test set and remaining 9 sessions as training set.
+4. Create two csv files for each fold, one for training and one for testing. The names should be like: iemocap_01F.train.csv and iemocap_01F.test.csv. The csv file has 3 columns: file, emotion, text. The column 'file' indicates where to store the wav file; the column 'emotion' is the emotion label (we use 4 labels: e0, e1, e2, e3); the column 'text' is for transcript. For example, here is a sample csv file:
 ```bash
 file,emotion,text
 /path/to/Ses01F_impro01_F000.wav,e0,"EXCUSE ME ."
