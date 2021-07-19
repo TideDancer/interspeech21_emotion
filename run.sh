@@ -18,7 +18,7 @@ python run_emotion.py \
 --evaluation_strategy="steps" \
 --save_total_limit="1" \
 --save_steps="500" \
---eval_steps="100" \
+--eval_steps="500" \
 --logging_steps="50" \
 --logging_dir="log" \
 --learning_rate=$LR \
