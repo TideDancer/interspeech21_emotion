@@ -59,8 +59,7 @@ class Wav2Vec2ForCTCnCLS(Wav2Vec2PreTrainedModel):
     def _cls_loss(self, logits, cls_labels): # sum hidden_states over dim 1 (the sequence length), then feed into self.cls
         loss = None
         if cls_labels is not None:
-            h = F.softmax(logits, dim=1)
-            loss = F.cross_entropy(h, cls_labels)
+            loss = F.cross_entropy(logits, cls_labels.to(h.device))
         return loss
 
 
