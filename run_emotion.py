@@ -10,6 +10,7 @@ import datasets
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from packaging import version
 
 import librosa
@@ -149,7 +150,12 @@ class DataTrainingArguments:
     split_id: str = field(
         default=None, metadata={"help": "iemocap_ + splitid (e.g. 01M, 02F, etc) + train/test.csv"}
     )
-    
+
+    output_file: Optional[str] = field(
+        default=None,
+        metadata={"help": "Output file."},
+    )
+
 
 @dataclass
 class Orthography:
@@ -208,7 +214,10 @@ class Orthography:
         if len(self.translation_table) > 0:
             text = text.translate(self.translation_table)
         if len(self.words_to_remove) == 0:
-            text = " ".join(text.split())  # clean up whitespaces
+            try:
+                text = " ".join(text.split())  # clean up whitespaces
+            except:
+                text = "NULL"
         else:
             text = " ".join(w for w in text.split() if w not in self.words_to_remove)  # and clean up whilespaces
         return text
@@ -271,7 +280,6 @@ class DataCollatorCTCWithPadding:
         # split inputs and labels since they have to be of different lenghts and need
         # different padding methods
         input_features = [{"input_values": feature["input_values"]} for feature in features]
-
         label_features = [{"input_ids": feature["labels"][:-1]} for feature in features]
         cls_labels = [feature["labels"][-1] for feature in features]
 
@@ -293,7 +301,6 @@ class DataCollatorCTCWithPadding:
 
         # replace padding with -100 to ignore loss correctly
         ctc_labels = labels_batch["input_ids"].masked_fill(labels_batch.attention_mask.ne(1), -100)
-
         batch["labels"] = (ctc_labels, torch.tensor(cls_labels)) # labels = (ctc_labels, cls_labels)
 
         return batch
@@ -431,27 +438,29 @@ def main():
             example[data_args.target_text_column] = updated_text
         return example
 
-    train_dataset = train_dataset.map(prepare_example, remove_columns=[data_args.speech_file_column])
-    val_dataset = val_dataset.map(prepare_example, remove_columns=[data_args.speech_file_column])
+    if training_args.do_train:
+        train_dataset = train_dataset.map(prepare_example, remove_columns=[data_args.speech_file_column])
+    if training_args.do_predict or training_args.do_eval:
+        val_dataset = val_dataset.map(prepare_example, remove_columns=[data_args.speech_file_column])
 
     if data_args.max_duration_in_seconds is not None:
-
         def filter_by_max_duration(example):
             return example["duration_in_seconds"] <= data_args.max_duration_in_seconds
-
-        old_train_size = len(train_dataset)
-        old_val_size = len(val_dataset)
-        train_dataset = train_dataset.filter(filter_by_max_duration, remove_columns=["duration_in_seconds"])
-        val_dataset = val_dataset.filter(filter_by_max_duration, remove_columns=["duration_in_seconds"])
-        if len(train_dataset) > old_train_size:
-            logger.warning(
-                f"Filtered out {len(train_dataset) - old_train_size} train example(s) longer than {data_args.max_duration_in_seconds} second(s)."
-            )
-        if len(val_dataset) > old_val_size:
-            logger.warning(
-                f"Filtered out {len(val_dataset) - old_val_size} validation example(s) longer than {data_args.max_duration_in_seconds} second(s)."
-            )
-    logger.info(f"Split sizes: {len(train_dataset)} train and {len(val_dataset)} validation.")
+        if training_args.do_train:
+            old_train_size = len(train_dataset)
+            train_dataset = train_dataset.filter(filter_by_max_duration, remove_columns=["duration_in_seconds"])
+            if len(train_dataset) > old_train_size:
+                logger.warning(
+                    f"Filtered out {len(train_dataset) - old_train_size} train example(s) longer than {data_args.max_duration_in_seconds} second(s)."
+                )
+        if training_args.do_predict or training_args.do_eval:
+            old_val_size = len(val_dataset)
+            val_dataset = val_dataset.filter(filter_by_max_duration, remove_columns=["duration_in_seconds"])
+            if len(val_dataset) > old_val_size:
+                logger.warning(
+                    f"Filtered out {len(val_dataset) - old_val_size} validation example(s) longer than {data_args.max_duration_in_seconds} second(s)."
+                )
+    # logger.info(f"Split sizes: {len(train_dataset)} train and {len(val_dataset)} validation.")
 
     logger.warning(f"Updated {len(text_updates)} transcript(s) using '{data_args.orthography}' orthography rules.")
     if logger.isEnabledFor(logging.DEBUG):
@@ -464,36 +473,32 @@ def main():
         assert (
             len(set(batch["sampling_rate"])) == 1
         ), f"Make sure all inputs have the same sampling rate of {processor.feature_extractor.sampling_rate}."
-
         batch["input_values"] = processor(batch["speech"], sampling_rate=batch["sampling_rate"][0]).input_values
-
         cls_labels = list(map(lambda e: cls_label_map[e], batch["emotion"]))
-
         with processor.as_target_processor():
             batch["labels"] = processor(batch[data_args.target_text_column]).input_ids
-        
         for i in range(len(cls_labels)):
             batch["labels"][i].append(cls_labels[i]) # batch["labels"] element has to be a single list
-
         return batch
 
-    train_dataset = train_dataset.map(
-        prepare_dataset,
-        batch_size=training_args.per_device_train_batch_size,
-        batched=True,
-        num_proc=data_args.preprocessing_num_workers,
-    )
-    val_dataset = val_dataset.map(
-        prepare_dataset,
-        batch_size=training_args.per_device_train_batch_size,
-        batched=True,
-        num_proc=data_args.preprocessing_num_workers,
-    )
+    if training_args.do_train:
+        train_dataset = train_dataset.map(
+            prepare_dataset,
+            batch_size=training_args.per_device_train_batch_size,
+            batched=True,
+            num_proc=data_args.preprocessing_num_workers,
+        )
+    if training_args.do_eval or training_args.do_predict:
+        val_dataset = val_dataset.map(
+            prepare_dataset,
+            batch_size=training_args.per_device_train_batch_size,
+            batched=True,
+            num_proc=data_args.preprocessing_num_workers,
+        )
 
     data_collator = DataCollatorCTCWithPadding(processor=processor, padding=True)
 
     def compute_metrics(pred):
-
         cls_pred_logits = pred.predictions[1]
         cls_pred_ids = np.argmax(cls_pred_logits, axis=-1)
         total = len(pred.label_ids[1])
@@ -514,7 +519,6 @@ def main():
                     logger.debug(f'predicted (untransliterated): "{orthography.untransliterator(predicted)}"')
 
         wer = wer_metric.compute(predictions=ctc_pred_str, references=ctc_label_str)
-
         return {"acc": correct/total, "wer": wer, "correct": correct, "total": total, "strlen": len(ctc_label_str)}
 
     if model_args.freeze_feature_extractor:
@@ -537,8 +541,27 @@ def main():
     else:
         checkpoint = None
 
-    trainer.train(resume_from_checkpoint=checkpoint)
-    trainer.save_model() 
+    if training_args.do_train:
+        trainer.train(resume_from_checkpoint=checkpoint)
+        trainer.save_model() 
+
+    if training_args.do_predict:
+        logger.info('******* Predict ********')
+        predictions, labels, metrics = trainer.predict(val_dataset, metric_key_prefix="predict")
+        logits_ctc, logits_cls = predictions
+        pred_ids = np.argmax(logits_cls, axis=-1)
+        pred_probs = F.softmax(torch.from_numpy(logits_cls).float(), dim=-1)
+        print(val_dataset)
+        with open(data_args.output_file, 'w') as f:
+            for i in range(len(pred_ids)):
+                f.write(val_dataset[i]['file'].split("/")[-1] + " " + str(len(val_dataset[i]['input_values'])/16000) + " ")
+                pred = pred_ids[i]
+                f.write(str(pred)+' ')
+                for j in range(4):
+                    f.write(' ' + str(pred_probs[i][j].item()))
+                f.write('\n')
+        f.close()
+
 
 if __name__ == "__main__":
     main()

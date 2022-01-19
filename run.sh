@@ -21,6 +21,8 @@ python run_emotion.py \
 --eval_steps="500" \
 --logging_steps="50" \
 --logging_dir="log" \
+--do_train \
+--do_eval \
 --learning_rate=$LR \
 --model_name_or_path=facebook/$MODEL \
 --tokenizer facebook/$TOKENIZER \

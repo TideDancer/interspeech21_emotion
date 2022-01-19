@@ -6,6 +6,7 @@ This repo contains the code for the paper:
 The code is based on https://github.com/huggingface/transformers/tree/master/examples/research_projects/wav2vec2.
 
 ## Files and folders
+* paper_slides/: the paper and corresponding slides.
 * model.py: the Wav2vec-2.0 model that inherites from Huggingface's Wav2vec-2.0 model, with a classification head in addition to the CTC head.
 * run_emotion.py: the main python code that could runs the emotion recognition task.
 * run.sh: the script to test running.
@@ -48,6 +49,13 @@ The model = wav2vec2-base, alpha = 0.1, LR = 1e-5, effective batch size = 8, tot
 The 01F split will be used as testing and remaining will be used as training.
 
 WARNING: If running on 1 single GPU, 100 epochs will take days to finish. To speed up, consider using multiple GPUs. By default, the code use all GPUs in the system.
+
+## For inference 
+After training, you can run the inference code, using the saved model in output/tmp (or providing another path with a saved model):
+```bash
+bash prediction.sh output/tmp
+```
+This will generate a classification result, in output/predictions/tmp. Details can be found in the script.
 
 ## Important parameters
 Key parameters:
