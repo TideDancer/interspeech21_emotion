@@ -50,7 +50,7 @@ The 01F split will be used as testing and remaining will be used as training.
 
 NOTE: At around 40 epochs, the eval acc should already reaches a fairly good results. But due to the learning rate at this time is still high, there will be fluctuations. Nevertheless, verifying or early stopping could save time and get a reasonable good model.
 
-WARNING: If running on 1 single GPU, 100 epochs will take days to finish. To speed up, consider using multiple GPUs. By default, the code use all GPUs in the system.
+WARNING: If running on 1 single GPU, 200 epochs will take days to finish. To speed up, consider using multiple GPUs. By default, the code use all GPUs in the system.
 
 ## For inference 
 After training, you can run the inference code, using the saved model in output/tmp (or providing another path with a saved model):
@@ -63,7 +63,7 @@ This will generate a classification result, in output/predictions/tmp. Details c
 Key parameters:
 * MODEL : wav2vec2-base / wav2vec2-large-960h.
 * ALPHA : loss = ctc + alpha * cls, 0.1 would be good enough for wav2vec2-base, 0.01 for wav2vec2-large-960h.
-* LR : learning rate, recommended 1e-5.
+* LR : learning rate, recommended 5e-5 when effective batch size == 8.
 * ACC : accumulated batch size. The effective batch size = batch_per_gpu * gpu_num * acc.
 * WORKER_NUM : the number of cpu for data preprocessing, please set to the maximum cpu number in the machine.
 * --num_train_epochs : number of training epochs, recommended > 100.
