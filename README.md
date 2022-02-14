@@ -45,8 +45,10 @@ file,emotion,text
 bash run.sh
 ```
 This will run the code and generates results in output/tmp/ folder, while cache files are stored in cache/.
-The model = wav2vec2-base, alpha = 0.1, LR = 1e-5, effective batch size = 8, total train epochs = 100.
+The model = wav2vec2-base, alpha = 0.1, LR = 5e-5, effective batch size = 8, total train epochs = 200.
 The 01F split will be used as testing and remaining will be used as training.
+
+NOTE: At around 40 epochs, the eval acc should already reaches a fairly good results. But due to the learning rate at this time is still high, there will be fluctuations. Nevertheless, verifying or early stopping could save time and get a reasonable good model.
 
 WARNING: If running on 1 single GPU, 100 epochs will take days to finish. To speed up, consider using multiple GPUs. By default, the code use all GPUs in the system.
 
