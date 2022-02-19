@@ -70,6 +70,5 @@ Key parameters:
 * --split_id : the split partition used for testing, values are 01F 01M 02F 02M 03F 03M 04F 04M 05F 05M. The reamining partitions are used for training.
 
 Parameters not recommended:
-* --freeze_feature_extractor : this will freeze the wav2vec2.0 model, except for the ctc and cls head. This will significantly hurt the final performance.
 * --group_by_length : this will significantly slow down data preprocessing step, but potentially improve training efficiency.
 
