@@ -545,6 +545,14 @@ def main():
         trainer.train(resume_from_checkpoint=checkpoint)
         trainer.save_model() 
 
+    if training_args.do_eval:
+        predictions, labels, metrics = trainer.predict(val_dataset, metric_key_prefix="eval")
+        logits_ctc, logits_cls = predictions
+        pred_ids = np.argmax(logits_cls, axis=-1)
+        correct = np.sum(pred_ids == labels[1])
+        acc = correct / len(pred_ids)
+        print('correct:', correct, ', acc:', acc)
+
     if training_args.do_predict:
         logger.info('******* Predict ********')
         predictions, labels, metrics = trainer.predict(val_dataset, metric_key_prefix="predict")

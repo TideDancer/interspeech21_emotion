@@ -59,6 +59,17 @@ bash prediction.sh output/tmp
 ```
 This will generate a classification result, in output/predictions/tmp. Details can be found in the script.
 
+## Reproduce using checkpoints
+To reproduce the paper's results using the cheeckpoints:
+1. Download the checkpoints from https://drive.google.com/drive/folders/1Ndybde47HDy8O7aiNvT14pT7FqkqOsSX?usp=sharing, save them at ./ckpts/
+2. Run the following:
+```bash
+for s in 01F 01M 02F 02M 03F 03M 04F 04M 05F 05M; do bash reproduce.sh ckpts/$s/ $s > output/$s.eval; done
+```
+This will generate evaluation results using the downloaded checkpoints. The evaluation results are saved in output/ folder, named as 01F.eval, 01M.eval, etc.
+The last line in each *.eval file, indicates number of correct predictions and accuracy for that folder (10-folds in total).
+If you sum the correct number and divide by 5531 (total utterance number), you should get the accuraccy slightly above 0.78.
+
 ## Important parameters
 Key parameters:
 * MODEL : wav2vec2-base / wav2vec2-large-960h.

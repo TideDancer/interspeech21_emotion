@@ -4,3 +4,6 @@ cache/
 output/
 wandb/
 venv/
+iemocap_*/
+__pycache__/
+ckpts/
