@@ -1,6 +1,6 @@
 export CKPT=$1 #the path of trained model
 mkdir -p output/predictions
-export SAVE_PATH=output/predictons/$(basename $CKPT)
+export SAVE_PATH=output/predictions/$(basename $CKPT)
 
 python run_emotion.py \
 --output_dir=$SAVE_PATH \
@@ -24,5 +24,5 @@ python run_emotion.py \
 --tokenizer facebook/wav2vec2-base \
 --preprocessing_num_workers=20 \
 --fp16 \
---dataloader_num_workers 4 &
+--dataloader_num_workers 4 
 

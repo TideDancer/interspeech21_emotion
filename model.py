@@ -91,12 +91,14 @@ class Wav2Vec2ForCTCnCLS(Wav2Vec2PreTrainedModel):
         logits_ctc = self.lm_head(hidden_states)
         logits_cls = self.cls_head(torch.mean(hidden_states, dim=1))
 
-        if if_ctc:
-            loss_ctc = self._ctc_loss(logits_ctc, labels[0], input_values, attention_mask)
-        if if_cls:
-            loss_cls = self._cls_loss(logits_cls, labels[1])
+        loss = None
+        if labels is not None:
+            if if_ctc:
+                loss_ctc = self._ctc_loss(logits_ctc, labels[0], input_values, attention_mask)
+            if if_cls:
+                loss_cls = self._cls_loss(logits_cls, labels[1])
 
-        loss = loss_cls + self.alpha * loss_ctc
+            loss = loss_cls + self.alpha * loss_ctc
 
         # if not return_dict:
         #     output = (logits,) + outputs[1:]

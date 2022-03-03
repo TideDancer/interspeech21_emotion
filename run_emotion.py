@@ -99,7 +99,7 @@ class DataTrainingArguments:
     """
 
     dataset_name: str = field(
-        default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}
+        default='emotion', metadata={"help": "The name of the dataset to use (via the datasets library)."}
     )
     dataset_config_name: Optional[str] = field(
         default=None, metadata={"help": "The configuration name of the dataset to use (via the datasets library)."}
@@ -148,7 +148,7 @@ class DataTrainingArguments:
 
     # select which split as test
     split_id: str = field(
-        default=None, metadata={"help": "iemocap_ + splitid (e.g. 01M, 02F, etc) + train/test.csv"}
+        default='01F', metadata={"help": "iemocap_ + splitid (e.g. 01M, 02F, etc) + train/test.csv"}
     )
 
     output_file: Optional[str] = field(
@@ -275,13 +275,15 @@ class DataCollatorCTCWithPadding:
     max_length_labels: Optional[int] = None
     pad_to_multiple_of: Optional[int] = None
     pad_to_multiple_of_labels: Optional[int] = None
+    audio_only = False
 
     def __call__(self, features: List[Dict[str, Union[List[int], torch.Tensor]]]) -> Dict[str, torch.Tensor]:
         # split inputs and labels since they have to be of different lenghts and need
         # different padding methods
         input_features = [{"input_values": feature["input_values"]} for feature in features]
-        label_features = [{"input_ids": feature["labels"][:-1]} for feature in features]
-        cls_labels = [feature["labels"][-1] for feature in features]
+        if self.audio_only is False:
+            label_features = [{"input_ids": feature["labels"][:-1]} for feature in features]
+            cls_labels = [feature["labels"][-1] for feature in features]
 
         batch = self.processor.pad(
             input_features,
@@ -290,18 +292,19 @@ class DataCollatorCTCWithPadding:
             pad_to_multiple_of=self.pad_to_multiple_of,
             return_tensors="pt",
         )
-        with self.processor.as_target_processor():
-            labels_batch = self.processor.pad(
-                label_features,
-                padding=self.padding,
-                max_length=self.max_length_labels,
-                pad_to_multiple_of=self.pad_to_multiple_of_labels,
-                return_tensors="pt",
-            )
+        if self.audio_only is False:
+            with self.processor.as_target_processor():
+                labels_batch = self.processor.pad(
+                    label_features,
+                    padding=self.padding,
+                    max_length=self.max_length_labels,
+                    pad_to_multiple_of=self.pad_to_multiple_of_labels,
+                    return_tensors="pt",
+                )
 
-        # replace padding with -100 to ignore loss correctly
-        ctc_labels = labels_batch["input_ids"].masked_fill(labels_batch.attention_mask.ne(1), -100)
-        batch["labels"] = (ctc_labels, torch.tensor(cls_labels)) # labels = (ctc_labels, cls_labels)
+            # replace padding with -100 to ignore loss correctly
+            ctc_labels = labels_batch["input_ids"].masked_fill(labels_batch.attention_mask.ne(1), -100)
+            batch["labels"] = (ctc_labels, torch.tensor(cls_labels)) # labels = (ctc_labels, cls_labels)
 
         return batch
 
@@ -426,21 +429,24 @@ def main():
     )
     text_updates = []
 
-    def prepare_example(example):  # TODO(elgeish) make use of multiprocessing?
+    def prepare_example(example, audio_only=False):  # TODO(elgeish) make use of multiprocessing?
         example["speech"], example["sampling_rate"] = librosa.load(example[data_args.speech_file_column], sr=target_sr)
         if data_args.max_duration_in_seconds is not None:
             example["duration_in_seconds"] = len(example["speech"]) / example["sampling_rate"]
-        # Normalize and clean up text; order matters!
-        updated_text = orthography.preprocess_for_training(example[data_args.target_text_column])
-        updated_text = vocabulary_text_cleaner.sub("", updated_text)
-        if updated_text != example[data_args.target_text_column]:
-            text_updates.append((example[data_args.target_text_column], updated_text))
-            example[data_args.target_text_column] = updated_text
+        if audio_only is False:
+            # Normalize and clean up text; order matters!
+            updated_text = orthography.preprocess_for_training(example[data_args.target_text_column])
+            updated_text = vocabulary_text_cleaner.sub("", updated_text)
+            if updated_text != example[data_args.target_text_column]:
+                text_updates.append((example[data_args.target_text_column], updated_text))
+                example[data_args.target_text_column] = updated_text
         return example
 
     if training_args.do_train:
         train_dataset = train_dataset.map(prepare_example, remove_columns=[data_args.speech_file_column])
-    if training_args.do_predict or training_args.do_eval:
+    if training_args.do_predict:
+        val_dataset = val_dataset.map(prepare_example, fn_kwargs={'audio_only':True})
+    elif training_args.do_eval:
         val_dataset = val_dataset.map(prepare_example, remove_columns=[data_args.speech_file_column])
 
     if data_args.max_duration_in_seconds is not None:
@@ -468,17 +474,18 @@ def main():
             logger.debug(f'Updated text: "{original_text}" -> "{updated_text}"')
     text_updates = None
 
-    def prepare_dataset(batch):
+    def prepare_dataset(batch, audio_only=False):
         # check that all files have the correct sampling rate
         assert (
             len(set(batch["sampling_rate"])) == 1
         ), f"Make sure all inputs have the same sampling rate of {processor.feature_extractor.sampling_rate}."
         batch["input_values"] = processor(batch["speech"], sampling_rate=batch["sampling_rate"][0]).input_values
-        cls_labels = list(map(lambda e: cls_label_map[e], batch["emotion"]))
-        with processor.as_target_processor():
-            batch["labels"] = processor(batch[data_args.target_text_column]).input_ids
-        for i in range(len(cls_labels)):
-            batch["labels"][i].append(cls_labels[i]) # batch["labels"] element has to be a single list
+        if audio_only is False:
+            cls_labels = list(map(lambda e: cls_label_map[e], batch["emotion"]))
+            with processor.as_target_processor():
+                batch["labels"] = processor(batch[data_args.target_text_column]).input_ids
+            for i in range(len(cls_labels)):
+                batch["labels"][i].append(cls_labels[i]) # batch["labels"] element has to be a single list
         return batch
 
     if training_args.do_train:
@@ -488,7 +495,15 @@ def main():
             batched=True,
             num_proc=data_args.preprocessing_num_workers,
         )
-    if training_args.do_eval or training_args.do_predict:
+    if training_args.do_predict:
+        val_dataset = val_dataset.map(
+            prepare_dataset,
+            fn_kwargs={'audio_only':True},
+            batch_size=training_args.per_device_train_batch_size,
+            batched=True,
+            num_proc=data_args.preprocessing_num_workers,
+        )
+    elif training_args.do_eval:
         val_dataset = val_dataset.map(
             prepare_dataset,
             batch_size=training_args.per_device_train_batch_size,
@@ -545,16 +560,9 @@ def main():
         trainer.train(resume_from_checkpoint=checkpoint)
         trainer.save_model() 
 
-    if training_args.do_eval:
-        predictions, labels, metrics = trainer.predict(val_dataset, metric_key_prefix="eval")
-        logits_ctc, logits_cls = predictions
-        pred_ids = np.argmax(logits_cls, axis=-1)
-        correct = np.sum(pred_ids == labels[1])
-        acc = correct / len(pred_ids)
-        print('correct:', correct, ', acc:', acc)
-
     if training_args.do_predict:
         logger.info('******* Predict ********')
+        data_collator.audio_only=True
         predictions, labels, metrics = trainer.predict(val_dataset, metric_key_prefix="predict")
         logits_ctc, logits_cls = predictions
         pred_ids = np.argmax(logits_cls, axis=-1)
@@ -570,6 +578,13 @@ def main():
                 f.write('\n')
         f.close()
 
+    elif training_args.do_eval:
+        predictions, labels, metrics = trainer.predict(val_dataset, metric_key_prefix="eval")
+        logits_ctc, logits_cls = predictions
+        pred_ids = np.argmax(logits_cls, axis=-1)
+        correct = np.sum(pred_ids == labels[1])
+        acc = correct / len(pred_ids)
+        print('correct:', correct, ', acc:', acc)
 
 if __name__ == "__main__":
     main()

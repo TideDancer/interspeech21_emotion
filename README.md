@@ -57,7 +57,8 @@ After training, you can run the inference code, using the saved model in output/
 ```bash
 bash prediction.sh output/tmp
 ```
-This will generate a classification result, in output/predictions/tmp. Details can be found in the script.
+This will generate a classification result, for the 01F_test split, in output/predictions/tmp. Details can be found in the script.
+NOTE: If you want to use your own inference data (prepared in a csv file), please modify the load_dataset() part in run_emotion.py.
 
 ## Reproduce using checkpoints
 To reproduce the paper's results using the cheeckpoints:

@@ -7,3 +7,5 @@ venv/
 iemocap_*/
 __pycache__/
 ckpts/
+venv
+venv/
