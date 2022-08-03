@@ -1,6 +1,6 @@
 numpy
-transformers
-datasets
+transformers==4.4.2
+datasets==1.4.1
 wandb
 torch>=1.5.0
 torchaudio
