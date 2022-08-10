@@ -414,7 +414,7 @@ def main():
     model = Wav2Vec2ForCTCnCLS.from_pretrained(
         model_args.model_name_or_path,
         cache_dir=model_args.cache_dir,
-        gradient_checkpointing=training_args.gradient_checkpointing,
+        gradient_checkpointing=True, # training_args.gradient_checkpointing,
         vocab_size=len(processor.tokenizer),
         cls_len=len(cls_label_map),
         alpha=model_args.alpha,

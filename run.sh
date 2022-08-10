@@ -26,8 +26,8 @@ python run_emotion.py \
 --learning_rate=$LR \
 --model_name_or_path=facebook/$MODEL \
 --tokenizer facebook/$TOKENIZER \
---fp16 \
 --preprocessing_num_workers=$WORKER_NUM \
---gradient_checkpointing true \
 --dataloader_num_workers $WORKER_NUM
 # --freeze_feature_extractor \
+# --gradient_checkpointing true \
+# --fp16 \
